@@ -1,0 +1,22 @@
+# RSS 订阅源（使用官方 RSS）
+feeds:
+  # 财经媒体（官方 RSS）
+  - name: "华尔街见闻"
+    url: "https://wallstreetcn.com/news/global"
+    category: "media"
+    
+  - name: "新浪财经-股票"
+    url: "https://finance.sina.com.cn/stock/"
+    category: "media"
+    
+  - name: "界面新闻-宏观"
+    url: "https://www.jiemian.com/rss/news.xml"
+    category: "media"
+
+  # 备用：需要自建 RSSHub
+  # - name: "雪球-7x24快讯"
+  #   url: "https://rsshub.app/xueqiu/hots"
+  #   category: "social"
+
+# 说明：公共 RSSHub 不稳定，建议自建
+# 自建方法：https://docs.rsshub.app/deploy/

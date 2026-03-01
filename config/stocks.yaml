@@ -1,0 +1,12 @@
+# 监控的股票列表
+stocks:
+  - code: "601872.SH"
+    name: "招商轮船"
+    keywords:
+      - "招商轮船"
+      - "601872"
+      - "轮船"
+      - "招商局"
+    aliases:
+      - "CMES"
+      - "China Merchants Energy Shipping"
