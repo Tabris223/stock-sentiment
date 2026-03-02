@@ -204,7 +204,7 @@ class MultiSourceFetcher:
         return entries
     
     def fetch_sector_fund_flow(self, limit: int = 50) -> List[Dict]:
-        """获取行业资金流 - P1 重要
+        """获取行业资金流 - P1 重要（东方财富接口，备用）
         
         Args:
             limit: 最多返回条数
@@ -214,7 +214,7 @@ class MultiSourceFetcher:
         
         entries = []
         try:
-            logger.info(f"[资金流] 获取行业资金流...")
+            logger.info(f"[资金流] 获取行业资金流（东方财富）...")
             df = ak.stock_sector_fund_flow_rank(indicator="今日")
             
             if df is not None and not df.empty:
@@ -239,6 +239,81 @@ class MultiSourceFetcher:
             logger.warning(f"  ✗ 行业资金流获取失败: {e}")
         
         return entries
+    
+    def fetch_ths_industry_fund_flow(self, limit: int = 100, period: str = "即时") -> List[Dict]:
+        """同花顺行业资金流
+        
+        Args:
+            limit: 最多返回条数
+            period: 时间周期（即时/3日/5日/10日/20日）
+        """
+        if not self._is_enabled(SourceType.FUND_FLOW):
+            return []
+        
+        try:
+            logger.info(f"[资金流] 获取同花顺行业资金流（{period}）...")
+            df = ak.stock_fund_flow_industry(symbol=period)
+            
+            if df is not None and not df.empty:
+                entries = []
+                for _, row in df.head(limit).iterrows():
+                    sector_name = str(row.get("行业", ""))
+                    net_amount = row.get("净额", "N/A")
+                    entries.append({
+                        "title": f"【{sector_name}】净额: {net_amount}亿",
+                        "link": "",
+                        "summary": f"主力净流入: {net_amount}亿, 涨跌幅: {row.get('行业-涨跌幅', 'N/A')}%, 领涨股: {row.get('领涨股', 'N/A')}",
+                        "published": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "source": "同花顺",
+                        "source_type": SourceType.FUND_FLOW.value,
+                        "sector": sector_name,
+                    })
+                logger.info(f"  ✓ 获取 {len(entries)} 条同花顺行业资金流")
+                return entries
+            else:
+                logger.warning(f"  ✗ 同花顺行业资金流数据为空")
+                return []
+        except Exception as e:
+            logger.warning(f"  ✗ 同花顺行业资金流获取失败: {e}")
+            return []
+    
+    def fetch_ths_individual_fund_flow(self, limit: int = 100, period: str = "即时") -> List[Dict]:
+        """同花顺个股资金流
+        
+        Args:
+            limit: 最多返回条数
+            period: 时间周期（即时/3日/5日/10日/20日）
+        """
+        if not self._is_enabled(SourceType.FUND_FLOW):
+            return []
+        
+        try:
+            logger.info(f"[资金流] 获取同花顺个股资金流（{period}）...")
+            df = ak.stock_fund_flow_individual(symbol=period)
+            
+            if df is not None and not df.empty:
+                entries = []
+                for _, row in df.head(limit).iterrows():
+                    stock_name = str(row.get("股票简称", ""))
+                    net_amount = row.get("净额", "N/A")
+                    entries.append({
+                        "title": f"【{stock_name}】净额: {net_amount}",
+                        "link": "",
+                        "summary": f"主力净流入: {net_amount}, 涨跌幅: {row.get('涨跌幅', 'N/A')}, 换手率: {row.get('换手率', 'N/A')}",
+                        "published": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "source": "同花顺",
+                        "source_type": SourceType.FUND_FLOW.value,
+                        "stock_code": str(row.get("股票代码", "")),
+                        "stock_name": stock_name,
+                    })
+                logger.info(f"  ✓ 获取 {len(entries)} 条同花顺个股资金流")
+                return entries
+            else:
+                logger.warning(f"  ✗ 同花顺个股资金流数据为空")
+                return []
+        except Exception as e:
+            logger.warning(f"  ✗ 同花顺个股资金流获取失败: {e}")
+            return []
     
     def fetch_individual_fund_flow(self, stock_code: str, stock_name: str, limit: int = 50) -> List[Dict]:
         """获取个股资金流 - P1 重要
@@ -323,8 +398,12 @@ class MultiSourceFetcher:
             entries = self.fetch_research_report(limit)
             all_entries.extend(entries)
             
-            # 5. 行业资金流
-            entries = self.fetch_sector_fund_flow(limit)
+            # 5. 行业资金流（使用同花顺接口替代东方财富）
+            entries = self.fetch_ths_industry_fund_flow(limit=limit)
+            all_entries.extend(entries)
+            
+            # 6. 个股资金流（同花顺）
+            entries = self.fetch_ths_individual_fund_flow(limit=limit)
             all_entries.extend(entries)
             
         finally:
