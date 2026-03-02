@@ -20,6 +20,7 @@ from ..schemas.news import (
 )
 from ..schemas.stock import ErrorResponse
 from ..fetcher.multi_source_fetcher import MultiSourceFetcher
+from ..analyzer.vector_dedup import VectorDedup
 
 logger = logging.getLogger(__name__)
 
@@ -97,13 +98,24 @@ def fetch_news(
         limit=request.limit
     )
     
+    # 初始化向量去重器
+    from ..analyzer.vector_dedup import get_vector_dedup
+    vector_dedup = get_vector_dedup()
+    
     # 统计信息
     fetched_count = len(entries)
     saved_count = 0
     duplicates = 0
+    vector_duplicates = 0  # 向量去重计数
     source_stats = defaultdict(lambda: {"fetched": 0, "saved": 0, "duplicates": 0})
     
-    # 保存到数据库（去重）
+    # 获取最近的新闻向量用于去重（性能优化：只比较最近100条）
+    recent_news_with_embeddings = db.query(News.embedding).filter(
+        News.embedding.isnot(None)
+    ).order_by(News.created_at.desc()).limit(100).all()
+    existing_embeddings = [n.embedding for n in recent_news_with_embeddings if n.embedding]
+    
+    # 保存到数据库（两级去重）
     for entry in entries:
         try:
             # 跳过无标题的新闻
@@ -111,13 +123,12 @@ def fetch_news(
                 logger.warning(f"跳过无标题新闻: {entry.get('link', 'unknown')}")
                 continue
             
-            # 计算哈希
+            # Level 1: 标题哈希去重
             content_hash = calculate_content_hash(
                 entry.get('title', ''),
                 entry.get('link', '')
             )
             
-            # 检查是否已存在
             existing = db.query(News).filter(
                 News.content_hash == content_hash
             ).first()
@@ -129,6 +140,17 @@ def fetch_news(
                 duplicates += 1
                 source_stats[source_type_value]["duplicates"] += 1
                 continue
+            
+            # Level 2: 向量语义去重（标题 + 头200字）
+            text_for_embedding = f"{entry.get('title', '')} {entry.get('summary', '')[:200]}"
+            new_embedding = vector_dedup.encode(text_for_embedding)
+            
+            if new_embedding and existing_embeddings:
+                if vector_dedup.check_duplicate(new_embedding, existing_embeddings, threshold=0.95):
+                    vector_duplicates += 1
+                    source_stats[source_type_value]["duplicates"] += 1
+                    logger.info(f"[向量去重] 发现相似新闻: {entry.get('title', '')[:50]}...")
+                    continue
             
             # 解析发布时间 - 使用 dateutil.parser 自动处理多种格式
             publish_time = datetime.now()
@@ -157,12 +179,17 @@ def fetch_news(
                 source_type=source_type_value,
                 publish_time=publish_time,
                 url=entry.get('link', ''),
-                content_hash=content_hash
+                content_hash=content_hash,
+                embedding=new_embedding  # 保存向量
             )
             
             db.add(news)
             saved_count += 1
             source_stats[source_type_value]["saved"] += 1
+            
+            # 添加到已有向量列表（用于后续去重）
+            if new_embedding:
+                existing_embeddings.append(new_embedding)
             
         except Exception as e:
             logger.error(f"保存新闻失败: {e}", exc_info=True)
@@ -177,12 +204,16 @@ def fetch_news(
         for k, v in source_stats.items()
     ])
     
+    dedup_details = f"Hash去重: {duplicates}条"
+    if vector_duplicates > 0:
+        dedup_details += f", 向量去重: {vector_duplicates}条"
+    
     return FetchNewsResponse(
         fetched_count=fetched_count,
         saved_count=saved_count,
-        duplicates=duplicates,
+        duplicates=duplicates + vector_duplicates,
         source_stats=dict(source_stats),
-        message=f"成功抓取 {fetched_count} 条数据，保存 {saved_count} 条新记录，跳过 {duplicates} 条重复\n\n各数据源统计:\n{stats_msg}"
+        message=f"成功抓取 {fetched_count} 条数据，保存 {saved_count} 条新记录，跳过 {duplicates + vector_duplicates} 条重复\n去重详情: {dedup_details}\n\n各数据源统计:\n{stats_msg}"
     )
 
 
