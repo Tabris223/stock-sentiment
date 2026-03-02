@@ -41,10 +41,10 @@ class VectorDedup:
             raise
         
         # 尝试加载优先模型
-        # 注意：Qwen 模型需要 trust_remote_code=True 且可能不稳定，优先使用 fallback
+        # 主模型为多语言模型，fallback 为中文专用模型
         models_to_try = [
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-            "Qwen/Qwen2.5-0.5B-Instruct",  # 可能在某些环境下不可用
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",  # 主模型
+            "shibing624/text2vec-base-chinese",  # 中文 fallback
         ]
         
         if self.model_name:

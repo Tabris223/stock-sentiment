@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 import logging
 from dateutil import parser as date_parser
@@ -109,10 +109,12 @@ def fetch_news(
     vector_duplicates = 0  # 向量去重计数
     source_stats = defaultdict(lambda: {"fetched": 0, "saved": 0, "duplicates": 0})
     
-    # 获取最近的新闻向量用于去重（性能优化：只比较最近100条）
+    # 获取最近的新闻向量用于去重（性能优化：只比较最近500条 + 7天时间窗口）
+    cutoff = datetime.now() - timedelta(days=7)
     recent_news_with_embeddings = db.query(News.embedding).filter(
-        News.embedding.isnot(None)
-    ).order_by(News.created_at.desc()).limit(100).all()
+        News.embedding.isnot(None),
+        News.created_at >= cutoff
+    ).order_by(News.created_at.desc()).limit(500).all()
     existing_embeddings = [n.embedding for n in recent_news_with_embeddings if n.embedding]
     
     # 保存到数据库（两级去重）
