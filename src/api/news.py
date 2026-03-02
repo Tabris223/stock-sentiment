@@ -106,6 +106,11 @@ def fetch_news(
     # 保存到数据库（去重）
     for entry in entries:
         try:
+            # 跳过无标题的新闻
+            if not entry.get('title', '').strip():
+                logger.warning(f"跳过无标题新闻: {entry.get('link', 'unknown')}")
+                continue
+            
             # 计算哈希
             content_hash = calculate_content_hash(
                 entry.get('title', ''),
