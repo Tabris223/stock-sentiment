@@ -57,6 +57,21 @@ class MultiSourceFetcher:
         
         return time_str
     
+    def _get_market(self, stock_code: str) -> str:
+        """根据股票代码判断市场
+        
+        Args:
+            stock_code: 股票代码（纯数字）
+        
+        Returns:
+            市场代码：sh=上海，sz=深圳
+        """
+        if stock_code.startswith(('60', '68')):
+            return "sh"  # 上海
+        elif stock_code.startswith(('00', '30')):
+            return "sz"  # 深圳
+        return "sh"  # 默认上海
+    
     # ========== P0 数据源 ==========
     
     def fetch_stock_news_em(self, stock_code: str, stock_name: str, limit: int = 50) -> List[Dict]:
@@ -238,7 +253,8 @@ class MultiSourceFetcher:
         entries = []
         try:
             logger.info(f"[资金流] 获取 {stock_name}({stock_code}) 资金流...")
-            df = ak.stock_individual_fund_flow(stock=stock_code, market="sh")  # 假设上海市场
+            market = self._get_market(stock_code)
+            df = ak.stock_individual_fund_flow(stock=stock_code, market=market)
             
             if df is not None and not df.empty:
                 # 获取最新一条记录
