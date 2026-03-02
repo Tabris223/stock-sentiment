@@ -124,12 +124,13 @@ class MultiSourceFetcher:
             
             if df is not None and not df.empty:
                 for _, row in df.head(limit).iterrows():
+                    # ak.stock_news_main_cx() 返回列名: ['tag', 'summary', 'url']
                     entries.append({
-                        "title": str(row.get("标题", "")),
-                        "link": str(row.get("链接", "")),
-                        "summary": str(row.get("内容", ""))[:500],
-                        "published": self._parse_publish_time(row.get("时间")),
-                        "source": "东方财富",
+                        "title": str(row.get("tag", "")),
+                        "link": str(row.get("url", "")),
+                        "summary": str(row.get("summary", ""))[:500],
+                        "published": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "source": "财新",
                         "source_type": SourceType.FINANCE_NEWS.value,
                     })
                 logger.info(f"  ✓ 获取 {len(entries)} 条财经新闻")
