@@ -261,9 +261,9 @@ class MultiSourceFetcher:
                 # 获取最新一条记录
                 latest = df.head(1).iloc[0]
                 entries.append({
-                    "title": f"【{stock_name}】主力净流入 {latest.get('主力净流入', '')}万",
+                    "title": f"【{stock_name}】主力净流入 {latest.get('主力净流入-净额', '')}万",
                     "link": "",
-                    "summary": f"主力净流入: {latest.get('主力净流入', '')}万, 超大单: {latest.get('超大单净流入', '')}万, 大单: {latest.get('大单净流入', '')}万",
+                    "summary": f"主力净流入: {latest.get('主力净流入-净额', '')}万, 超大单: {latest.get('超大单净流入-净额', '')}万, 大单: {latest.get('大单净流入-净额', '')}万",
                     "published": self._parse_publish_time(latest.get("日期")),
                     "source": "东方财富",
                     "source_type": SourceType.FUND_FLOW.value,
